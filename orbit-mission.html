@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>مهمة المدار | Orbit Mission</title>
+<style>
+:root{--bg:#070b1f;--card:#131a3a;--fg:#f1f3ff;--mut:#9aa6d6;--ac:#ffb13d;--ok:#3ddc97;--bad:#ff7a85;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}input{-webkit-user-select:text;user-select:text}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
+body{margin:0;color:var(--fg);font-family:"Tajawal","Segoe UI",Tahoma,sans-serif;min-height:100vh;background:var(--bg) radial-gradient(1.5px 1.5px at 15% 20%,#fff9,transparent),radial-gradient(1.5px 1.5px at 80% 12%,#fff9,transparent),radial-gradient(1px 1px at 60% 70%,#fff8,transparent)}
+#app{max-width:420px;margin:0 auto;padding:14px}
+h1{font-size:28px;margin:8px 0;line-height:1.4}h1 span{color:var(--ac)}h2{font-size:21px;margin:10px 0}
+p{line-height:1.8;margin:4px 0}.mut{color:var(--mut);font-size:14px}
+#mt{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);left:8px;z-index:5;background:var(--card);border:0;border-radius:50%;width:38px;height:38px;font-size:18px;color:var(--fg)}
+.pb{margin-top:34px;font-size:14px;color:var(--mut)}.bar,.fb{height:10px;background:var(--card);border-radius:6px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--ac)}.fb i{display:block;height:100%;width:100%;background:var(--ok);transition:width .2s}
+.row{display:flex;gap:8px}.opt{flex:1;background:var(--card);color:var(--fg);border:2px solid transparent;border-radius:12px;padding:12px 4px;font:inherit;font-size:16px}.opt.on{border-color:var(--ac)}
+.tm{display:flex;justify-content:space-between;gap:6px;font-size:12px;background:var(--card);border-radius:10px;padding:6px 8px;margin-top:8px;color:var(--mut)}
+.go{display:block;width:100%;margin-top:12px;padding:15px;border:0;border-radius:14px;background:var(--ac);color:#1a1200;font:inherit;font-size:18px;font-weight:700;cursor:pointer}
+.go:disabled{opacity:.35}.go.alt{background:var(--card);color:var(--fg)}
+.big{font-size:80px;text-align:center;margin:14px 0;font-weight:700}
+.res{text-align:center;padding:16px 10px}.res .big{font-size:56px;margin:8px 0}
+.why{background:var(--card);border-radius:12px;padding:14px;border-inline-start:4px solid var(--bad);text-align:start}
+.ok .why{border-color:var(--ok)}
+canvas{width:100%;display:block;border-radius:14px;background:#0b1026;touch-action:none;margin-top:8px}
+.hold{-webkit-touch-callout:none;touch-action:none;user-select:none;-webkit-user-select:none}
+.task{display:block;width:100%;text-align:start;background:var(--card);color:var(--fg);border:0;border-radius:12px;padding:14px;margin-top:8px;font:inherit;font-size:17px}
+.task:disabled{opacity:.4}
+.leds{display:flex;gap:10px;justify-content:center;margin:12px}.leds span{width:16px;height:16px;border-radius:50%;background:#2a3566}.leds .on{background:var(--ok)}
+.w{position:relative}.hint{position:absolute;font-size:46px;pointer-events:none;opacity:0;animation:hn 3s ease-in-out forwards}
+@keyframes hn{0%{opacity:0;transform:translate(0,0)}15%{opacity:1}70%{opacity:1;transform:translate(var(--dx),var(--dy))}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
+</style></head><body><button id="mt" onclick="tg()">🔊</button><div id="app"></div>
+<script>
+const GAME_URL=/claude|anthropic/i.test(location.hostname)||!/^https?:$/.test(location.protocol)?'https://claude.ai/artifact/42ZVs95WSFceVUAktrNjce':location.href.replace(/[?#].*$/,'');
+const tele=(a,v,h)=>{const e=$('#tm');if(e)e.innerHTML=`<span>⛰️ الارتفاع ${a} كم</span><span>⚡ ${v} كم/س</span><span>🛡️ ${h}</span>`};
+const NM=['التصميم','الترتيب','الإطلاق','الصعود','الهبوط','المدار'];
+const DIF=[{n:'سهل',os:.8,sp:.7,ov:1.8,safe:85,cap:2.5,lf:4,w:1.4,oa:15,zone:1},{n:'متوسط',os:1,sp:.55,ov:1.2,safe:70,cap:2,lf:3,w:1,oa:20,zone:1},{n:'صعب',os:1.25,sp:.42,ov:.8,safe:55,cap:1.5,lf:2,w:.6,oa:28,zone:0}];let LV=1;const DF=()=>DIF[LV];
+let S={fuel:4,ratio:2,f2:0,name:''},D={},RT,AC,mute=false;const K={};
+addEventListener('contextmenu',e=>e.preventDefault());onkeydown=e=>K[e.key]=1;onkeyup=e=>K[e.key]=0;
+const $=s=>document.querySelector(s),app=$('#app');
+function snd(f,d=.15,ty='sine',v=.2,w=0){if(mute||!AC)return;const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+w;o.type=ty;o.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d)}
+function noise(d,v,lp){if(mute||!AC)return;const n=AC.sampleRate*d,b=AC.createBuffer(1,n,AC.sampleRate),a=b.getChannelData(0);for(let i=0;i<n;i++)a[i]=Math.random()*2-1;const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=b;f.type='lowpass';f.frequency.value=lp;g.gain.setValueAtTime(v,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);s.connect(f);f.connect(g);g.connect(AC.destination);s.start()}
+function say(t){if(mute)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='ar-SA';speechSynthesis.speak(u)}catch(e){}}
+function tg(){mute=!mute;$('#mt').textContent=mute?'🔇':'🔊';if(mute)try{speechSynthesis.cancel()}catch(e){}}
+function drawR(x,cx,cy,fl,d,sc=1){const nh=d.n=='p'?34:d.n=='f'?14:0,th=d.t=='s'?30:d.t=='l'?48:0,eh=d.e?18:0,H=nh+th+eh,b=nh+th;
+x.save();x.translate(cx,cy-H*sc/2);x.scale(sc,sc);
+if(d.f){const fw=d.f=='s'?9:18,fh=d.f=='s'?18:28;x.fillStyle='#d93f4a';[-1,1].forEach(s=>{x.beginPath();x.moveTo(s*12,b-fh);x.lineTo(s*(12+fw),b+4);x.lineTo(s*12,b);x.fill()})}
+if(th){x.fillStyle='#f4f6ff';x.fillRect(-12,nh,24,th);x.fillStyle='#4aa8ff';x.beginPath();x.arc(0,nh+th/2,5,0,7);x.fill()}
+if(d.n){x.fillStyle='#d93f4a';x.beginPath();if(d.n=='p'){x.moveTo(-12,nh);x.bezierCurveTo(-12,nh-16,-4,6,0,0);x.bezierCurveTo(4,6,12,nh-16,12,nh)}else x.rect(-12,0,24,14);x.fill()}
+if(d.e){const w=d.e=='s'?20:12;if(fl){x.fillStyle='#ffb13d';x.beginPath();x.moveTo(-w/2,b+eh);x.quadraticCurveTo(0,b+eh+34+Math.random()*10,w/2,b+eh);x.fill()}x.fillStyle='#555e80';x.beginPath();x.moveTo(-w/2,b);x.lineTo(w/2,b);x.lineTo(w/2+5,b+eh);x.lineTo(-w/2-5,b+eh);x.fill()}
+x.restore();return H*sc}
+const hd=i=>`<div class=pb><b>المرحلة ${i+1} من 6: ${NM[i]}</b><div class=bar><i style="width:${Math.round((i+1)*100/6)}%"></i></div></div>`;
+const hint=(l,t,dx,dy)=>`<div class=hint style="left:${l}%;top:${t}%;--dx:${dx}px;--dy:${dy}px">👆</div>`;
+const fbar=(f,c)=>{const p=Math.max(0,Math.min(100,f/c*100)),e=$('#fb');e.style.width=p+'%';e.style.background=p<25?'var(--bad)':'var(--ok)'};
+function fail(m,r){S.fails=(S.fails||0)+1;RT=r;snd(392,.4,'sine',.12);snd(330,.45,'sine',.12,.22);snd(262,.6,'sine',.1,.45);app.innerHTML=`<div class=res><div class=big>🌑</div><p style="color:#4aa8ff;font-weight:700;margin:6px 0">🔬 تقرير تحليل علمي</p><p class=why>${m}</p></div><button class=go onclick="RT()">🔁 إعادة المرحلة</button>`}
+function pass(i,m,fn){snd(660,.15);snd(880,.3,'sine',.2,.15);app.innerHTML=hd(i)+`<div class="res ok"><div class=big>✅</div><h2>أحسنتِ!</h2><p class=why>${m}</p></div><button class=go id=nb>المرحلة التالية</button>`;$('#nb').onclick=fn}
+function intro(){app.innerHTML=`<div class=res><canvas id=ic width=120 height=150 style="width:110px;margin:0 auto;background:none"></canvas><h1>مهمة المدار <span>|</span> <span dir=ltr style="color:inherit">Orbit Mission</span></h1><p style="font-size:17px">محاكاة علمية تفاعلية بمناسبة أسبوع الفضاء العالمي</p><p class=mut>تصميم وإعداد: لجين الحربي - الصف الثاني 6</p><p style="margin-top:14px">أهلاً بكِ يا مهندسة الصواريخ! ست مراحل من التصميم حتى المدار.</p></div><input id=nm maxlength=30 placeholder="اكتبي اسمك (اختياري) لتحصلي على شهادة عند النجاح" style="width:100%;padding:12px;border-radius:12px;border:1px solid #2a3566;background:var(--card);color:var(--fg);font:inherit;text-align:center"><p class=mut style="margin:14px 0 6px">مستوى الصعوبة</p><div class=row>${DIF.map((d,i)=>`<button class="opt ${i==LV?'on':''}" onclick="pickLv(${i})">${d.n}</button>`).join('')}</div><button class=go onclick=begin()>ابدأ المهمة الآن</button><p class=mut style="font-size:12px;margin-top:14px;text-align:center">تم بناء هذه المحاكاة المبسّطة استناداً إلى آلية عمل الصواريخ الفضائية الحديثة (مثل صاروخ <span dir=ltr>Falcon 9</span> وصواريخ وكالات الفضاء العالمية)</p>`;$('#nm').value=S.name||'';drawR($('#ic').getContext('2d'),60,75,1,{n:'p',t:'l',e:'s',f:'s'})}
+function pickLv(i){S.name=$('#nm').value;LV=i;intro()}
+function again(){S.fails=0;design()}
+function begin(){S.fails=0;S.name=($('#nm').value||'').trim();try{AC=new(window.AudioContext||window.webkitAudioContext)();AC.resume()}catch(e){}design()}
+const P=[['e','w','محرك ضعيف'],['e','s','محرك قوي'],['t','s','خزان صغير'],['t','l','خزان كبير'],['n','p','رأس مدبب'],['n','f','رأس مسطح'],['f','s','زعانف صغيرة'],['f','b','زعانف كبيرة']];
+const pc=i=>({x:45+(i%4)*90,y:i<4?340:420});
+function calc(){let m=0;if(D.e)m+=D.e=='w'?1:3;if(D.t)m+=D.t=='s'?1:3;if(D.n)m+=.5;if(D.f)m+=1;
+return[D.e?(D.e=='w'?8:16):0,m,20+(D.n=='p'?50:D.n=='f'?15:0)+(D.f=='s'?30:D.f=='b'?10:0)]}
+function design(){D={};
+app.innerHTML=hd(0)+`<div class=w><canvas id=c width=360 height=470></canvas>${hint(12,70,110,-230)}</div><button class=go id=ok disabled>✅ اعتماد التصميم</button>`;
+const c=$('#c'),x=c.getContext('2d');let dr=null,run=true;
+const pt=e=>{const r=c.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*360,y:(e.clientY-r.top)/r.height*470}};
+c.onpointerdown=e=>{const p=pt(e);P.forEach((q,i)=>{const o=pc(i);if(D[q[0]]!==q[1]&&Math.abs(p.x-o.x)<44&&Math.abs(p.y-o.y)<38)dr={i,x:p.x,y:p.y}});if(dr)c.setPointerCapture(e.pointerId)};
+c.onpointermove=e=>{if(dr){const p=pt(e);dr.x=p.x;dr.y=p.y}};
+c.onpointerup=()=>{if(dr){const q=P[dr.i];if(dr.x>90&&dr.x<270&&dr.y>85&&dr.y<270){D[q[0]]=q[1];snd(520,.1)}dr=null}};
+(function f(){if(!run)return;const[th,m,ae]=calc();
+x.fillStyle='#0b1026';x.fillRect(0,0,360,470);x.direction='rtl';x.textAlign='right';x.font='13px sans-serif';
+[['قوة الدفع',th/16,'#3ddc97'],['الوزن',m/8,'#ffb13d'],['انسيابية الهواء',ae/100,'#4aa8ff']].forEach(([l,v,col],i)=>{const y=10+i*24,w=160*Math.min(1,v);x.fillStyle='#9aa6d6';x.fillText(l,350,y+12);x.fillStyle='#131a3a';x.fillRect(100,y,160,14);x.fillStyle=col;x.fillRect(260-w,y,w,14)});
+x.font='34px sans-serif';x.textAlign='center';x.fillText(th&&th/m>=1.5?'🚀':'⚠️',45,50);
+x.setLineDash([6,6]);x.strokeStyle='#3a4680';x.strokeRect(120,95,120,160);x.setLineDash([]);
+drawR(x,180,175,0,D);
+x.textAlign='center';P.forEach((q,i)=>{const o=pc(i),on=D[q[0]]===q[1];x.globalAlpha=on?.25:1;x.fillStyle='#131a3a';x.fillRect(o.x-42,o.y-36,84,72);drawR(x,o.x,o.y+(q[0]=='f'?10:-6),0,{[q[0]]:q[1]},.7);x.fillStyle='#c9d0f0';x.font='11px sans-serif';x.fillText(q[2],o.x,o.y+30);x.globalAlpha=1});
+if(dr)drawR(x,dr.x,dr.y,0,{[P[dr.i][0]]:P[dr.i][1]});
+$('#ok').disabled=!(D.e&&D.t&&D.n&&D.f);requestAnimationFrame(f)})();
+$('#ok').onclick=()=>{run=false;const[th,m,ae]=calc();S.fuel=D.t=='s'?4:9;S.ratio=th/m;
+if(S.ratio<1.5)return fail("الصاروخ ثقيل جداً! جرّبي محركاً أقوى أو خزاناً أصغر.",design);
+if(ae<50)return fail("الهواء يقاوم شكل الصاروخ كثيراً! جرّبي رأساً مدبباً أو زعانف أصغر.",design);
+pass(0,"كلما زادت قوة الدفع وقلّ الوزن ارتفع الصاروخ بسهولة.",prep)}}
+const L=['🚧 إخلاء المنصة','⛽ تعبئة الوقود','🧪 فحص الأنظمة','🔥 تشغيل المحركات','🚀 الإطلاق'];
+const PM={1:"الوقود شديد الخطورة، لذلك تُخلى المنصة من الفريق قبل التعبئة!",2:"الفحص النهائي للأنظمة يتم بعد إخلاء المنصة وتعبئة الوقود.",3:"تشغيل المحركات قبل فحص الأنظمة غير آمن!",4:"الإطلاق قبل اكتمال التجهيز غير ممكن!"};
+function prep(){let nx=0;
+app.innerHTML=hd(1)+`<h2 style="text-align:center">رتّبي خطوات الإطلاق</h2><p class=mut style="text-align:center">اضغطي الخطوات بالترتيب الصحيح، والإطلاق يكون آخر خطوة</p><div class=w><div class=leds>${L.map((_,i)=>`<span id=l${i}></span>`).join('')}</div>`+[3,0,4,2,1].map(i=>`<button class=task id=b${i}>${L[i]}</button>`).join('')+hint(45,35,0,20)+`</div>`;
+L.forEach((_,i)=>$('#b'+i).onclick=()=>{if(i!==nx)return fail(PM[i],prep);$('#l'+i).classList.add('on');$('#b'+i).disabled=true;snd(500+i*60,.12);nx++;if(nx==5)setTimeout(()=>pass(1,"الترتيب الصحيح يحمي الفريق والصاروخ.",launch),600)})}
+function launch(){
+app.innerHTML=hd(2)+`<p class=why style="border-color:var(--ac);text-align:center">⏱️ اضغطي «إطلاق» في الوقت المناسب: عند الرقم 0 تماماً، لا قبله ولا بعده</p><div class=w><div class=big id=n style="margin:18px 0;min-height:96px">استعدي</div>${hint(45,62,0,50)}</div><button class=go id=gb>🚀 إطلاق</button>`;
+const n=$('#n'),t0=performance.now()+2000;let ln=6,done=false;
+const iv=setInterval(()=>{const t=5-(performance.now()-t0)/1000;
+if(t>5)return;
+if(t>0){const k=Math.ceil(t);n.textContent=k;if(k!==ln){ln=k;snd(440,.25);say(['','واحد','اثنان','ثلاثة','أربعة','خمسة'][k])}}
+else if(t>-DF().w){if(ln!==0){ln=0;snd(880,.5);say('انطلق')}n.textContent='0';n.style.color='var(--ok)'}
+else{clearInterval(iv);if(!done)fail("فاتتكِ لحظة الإطلاق! حاولي مرة ثانية.",launch)}},50);
+$('#gb').onclick=()=>{const t=5-(performance.now()-t0)/1000;done=true;clearInterval(iv);if(t>0)return fail("تعجّلتِ! اضغطي الإطلاق عند الرقم 0 تماماً.",launch);noise(2.5,.25,500);pass(2,"الضغط في اللحظة المناسبة هو سر الإطلاق الناجح.",ascentIntro)}}
+function ascent(){
+app.innerHTML=hd(3)+`<div class=tm id=tm></div><div class=fb><i id=fb></i></div><div class=w><canvas id=c width=360 height=380></canvas>${hint(25,72,150,0)}</div><button class="go hold alt" id=sl>🐢 تخفيف السرعة</button>`;
+const c=$('#c'),x=c.getContext('2d'),cap=Math.max(S.fuel,6),sl=$('#sl');
+let px=180,tx=180,fuel=S.fuel,time=0,ob=[],sp=0,run=true,slow=false,over=0,sy=-1,last=performance.now();
+let slowT=0;sl.onpointerdown=e=>{slow=true;slowT=performance.now()+700;try{sl.setPointerCapture(e.pointerId)}catch(_){}};sl.onpointerup=sl.onpointercancel=()=>{slow=false;slowT=performance.now()+700};
+const st=Array.from({length:40},()=>({x:Math.random()*360,y:Math.random()*380,z:Math.random()+.3}));
+c.onpointerdown=c.onpointermove=e=>{const r=c.getBoundingClientRect();tx=(e.clientX-r.left)/r.width*360};
+const end=m=>{run=false;fail(m,ascent)};
+(function f(now){if(!run)return;const dt=Math.min(.05,(now-last)/1000);last=now;time+=dt;
+const sep=time>=7.5,zone=time>4&&!sep,sl2=slow||K.ArrowDown||performance.now()<slowT,fa=sep?1.5:sl2?.5:1;fuel-=dt*(sep?.3:.45);
+if(sep&&sy<0){sy=330;snd(300,.3,'triangle')}
+if(K.ArrowLeft)tx-=260*dt;if(K.ArrowRight)tx+=260*dt;tx=Math.max(20,Math.min(340,tx));
+px+=(tx-px)*Math.min(1,dt*8);sp+=dt;
+if(sp>DF().sp){sp=0;ob.push({x:20+Math.random()*320,y:-20,k:Math.random()<.3?'f':'d'})}
+x.fillStyle=sep?'#050816':'#0b1026';x.fillRect(0,0,360,380);x.fillStyle='#fff';
+st.forEach(s=>x.fillRect(s.x,(s.y+time*90*s.z*fa)%380,1.5,1.5*s.z+1));
+x.font='28px serif';x.textAlign='center';
+for(const o of ob){o.y+=dt*(120+time*4)*fa*DF().os;x.fillText(o.k=='f'?'🔋':'☄️',o.x,o.y);
+if(Math.hypot(o.x-px,o.y-10-310)<30){if(o.k=='f'){fuel+=DF().cap;o.y=999;snd(900,.12)}else return end("اصطدم الصاروخ بحطام فضائي! حاولي تفاديه بالسحب.")}}
+ob=ob.filter(o=>o.y<400);
+if(zone){if(!sl2)over+=dt;x.fillStyle='rgba(255,93,108,.18)';x.fillRect(0,0,360,380);x.fillStyle='#fff';x.font='bold 18px sans-serif';x.fillText('⚠️ هواء كثيف! خفّفي السرعة',180,60);
+if(over>DF().ov)return end("السرعة عالية وسط الهواء الكثيف! اضغطي تخفيف السرعة لتحمي الصاروخ.")}
+if(sy>=0){sy+=dt*160;x.fillStyle='#8892b5';x.fillRect(px-12,sy,24,40);if(time<9.5){x.fillStyle='#3ddc97';x.font='bold 17px sans-serif';x.fillText('✅ انفصلت المرحلة الأولى! الصاروخ أخف',180,60)}}
+drawR(x,px,310,1,sep?{...D,t:'s'}:D);fbar(fuel,cap);tele(Math.round(Math.pow(time/14,1.5)*380),Math.round(Math.pow(time/14,1.2)*22000),zone&&!sl2&&over>DF().ov*.5?'ضغط عالٍ ⚠️':'سليم ✅');
+if(fuel<=0)return end("نفد الوقود! اجمعي كبسولات الطاقة 🔋 أو اختاري خزاناً أكبر.");
+if(time>=14){run=false;S.f2=fuel;return pass(3,"بعد انفصال الخزان يخف الصاروخ فتزيد سرعته في الفضاء.",landIntro)}
+requestAnimationFrame(f)})(last)}
+function note(i,em,t,sub,play,sci,fn,btn){app.innerHTML=hd(i)+`<div class=res style="padding-bottom:4px"><div class=big>${em}</div><h2>${t}</h2><p class=mut>${sub}</p></div><p style="color:var(--ac);font-weight:700;margin:12px 0 4px">🎮 طريقة اللعب</p><p class=why style="border-color:var(--ac)">${play}</p><p style="color:#4aa8ff;font-weight:700;margin:12px 0 4px">🔬 تنويه علمي</p><p class=why style="border-color:#4aa8ff">${sci}</p><button class=go id=nb>${btn}</button>`;$('#nb').onclick=fn}
+function ascentIntro(){snd(523,.2);snd(784,.35,'sine',.2,.2);
+note(3,'🚀','مرحلة الصعود','الآن ننطلق نحو الفضاء!',"اسحبي إصبعك يميناً ويساراً (أو الأسهم) لتفادي الحطام ☄️ وجمع كبسولات الطاقة 🔋. عند ظهور ⚠️ «هواء كثيف» اضغطي مطوّلاً على زر «تخفيف السرعة» (أو السهم ↓) حتى ينتهي التحذير.","كلما زادت سرعة الصاروخ في الهواء الكثيف زاد ضغط الهواء عليه، وتأتي لحظة أعلى ضغط بعد نحو دقيقة من الإطلاق. لذلك تخفّض الصواريخ قوة محركاتها قليلاً قبلها لحماية الهيكل، ثم ترفعها. وبعد ذلك تنفصل المرحلة الأولى الفارغة فيصبح الصاروخ أخف.",ascent,'ابدأ الصعود')}
+function win(){[523,659,784,1047].forEach((q,i)=>snd(q,.3,'sine',.2,i*.15));app.innerHTML=hd(5)+`<div class="res ok"><div class=big>🎉</div><h2>أنجزتِ المهمة بنجاح!</h2><p class=why>لقد نجحتِ في تصميم الصاروخ وقيادة الإطلاق، ثم الهبوط بسلام، ووضع القمر الصناعي في مداره... أثبتِ أنكِ مهندسة صواريخ قادرة على خوض أعقد التحديات العلمية!</p></div><div id=cw></div><button class=go onclick=again()>🚀 العبي مرة ثانية</button>`;cert()}
+function orbitIntro(){snd(523,.2);snd(784,.35,'sine',.2,.2);
+note(5,'🛰️','مرحلة المدار','حان وقت وضع القمر الصناعي في مداره!',"اضغطي مطوّلاً على زر «دفع جانبي» لتسريع القمر الصناعي حتى يصل مؤشر السرعة إلى المنطقة الخضراء، ثم اتركي الزر وراقبيه يدور حول الأرض دورة كاملة.","الجاذبية لا تختفي في المدار، بل تسحب القمر الصناعي نحو الأرض طوال الوقت. لكنه يتحرك جانبياً بسرعة كبيرة جداً (المحطة الفضائية الدولية نحو 28 ألف كيلومتر في الساعة) فيدور حول الأرض بدل أن يسقط عليها. إذا كانت السرعة قليلة سقط، وإذا زادت كثيراً ابتعد.",orbit,'ابدأ المرحلة')}
+function orbit(){const d=DF(),GM=275000,R=52;
+app.innerHTML=hd(5)+`<div class=tm id=tm></div><div class=w><canvas id=c width=360 height=380></canvas>${hint(46,86,0,12)}</div><button class="go hold" id=th>🛰️ دفع جانبي (اضغطي مطوّلاً)</button>`;
+const c=$('#c'),x=c.getContext('2d'),b=$('#th');
+let v=0,on=false,go=false,px=0,py=-110,vx=0,vy=0,tr=[],ang=0,pa=-Math.PI/2,run=true,last=performance.now();
+[b,c].forEach(e=>{e.onpointerdown=ev=>{if(!go){on=true;try{e.setPointerCapture(ev.pointerId)}catch(_){}}};e.onpointerup=e.onpointercancel=()=>{if(on&&v>8){go=true;vx=v;b.disabled=true}on=false};e.oncontextmenu=ev=>ev.preventDefault()});
+(function f(now){if(!run)return;const dt=Math.min(.05,(now-last)/1000);last=now;
+if(on)v=Math.min(80,v+d.oa*dt);
+if(go){for(let i=0;i<4;i++){const h=dt*1.6/4,r=Math.hypot(px,py),a=GM/(r*r);vx-=a*px/r*h;vy-=a*py/r*h;px+=vx*h;py+=vy*h}
+const r=Math.hypot(px,py);tr.push([px,py]);if(tr.length>300)tr.shift();
+const na=Math.atan2(py,px);let da=na-pa;if(da>Math.PI)da-=6.2832;if(da<-Math.PI)da+=6.2832;ang+=Math.abs(da);pa=na;
+if(r<56){run=false;return fail("السرعة كانت قليلة! الجاذبية سحبت القمر الصناعي نحو الأرض. جرّبي دفعاً أطول.",orbit)}
+if(r>205){run=false;return fail("السرعة كانت كبيرة! ابتعد القمر الصناعي عن الأرض. جرّبي دفعاً أقصر.",orbit)}
+if(ang>=6.28){run=false;return win()}}
+const cx=180,cy=200,sp=go?Math.hypot(vx,vy):v,sx=cx+px,sy=cy+py;
+x.fillStyle='#0b1026';x.fillRect(0,0,360,380);
+x.fillStyle='#2f6fd6';x.beginPath();x.arc(cx,cy,R,0,7);x.fill();x.fillStyle='#3ddc97';x.beginPath();x.arc(cx-14,cy-8,15,0,7);x.arc(cx+16,cy+14,10,0,7);x.fill();
+x.strokeStyle='rgba(255,255,255,.35)';x.lineWidth=2;x.beginPath();tr.forEach(([a,q],i)=>i?x.lineTo(cx+a,cy+q):x.moveTo(cx+a,cy+q));x.stroke();
+x.strokeStyle='#ffb13d';x.beginPath();x.moveTo(sx,sy);x.lineTo(sx+(go?vx:v)*.6,sy+(go?vy:0)*.6);x.stroke();
+x.fillStyle='#131a3a';x.fillRect(30,14,300,14);if(d.zone){x.fillStyle='rgba(61,220,151,.4)';x.fillRect(30+300*42.5/80,14,300*17.5/80,14)}
+x.fillStyle=sp<42.5?'#ffb13d':sp<=60?'#3ddc97':'#ff7a85';x.fillRect(30,14,300*Math.min(1,sp/80),14);
+x.fillStyle='#9aa6d6';x.font='12px sans-serif';x.textAlign='center';x.fillText('السرعة',180,44);
+x.font='24px serif';x.fillText('🛰️',sx,sy+8);tele(Math.max(0,Math.round((Math.hypot(px,py)-R)/58*400)),Math.round(sp*552),'سليم ✅');
+requestAnimationFrame(f)})(last)}
+function qr(cb){const L=()=>{try{const d=document.createElement('div');new QRCode(d,{text:GAME_URL,width:80,height:80});setTimeout(()=>{const q=d.querySelector('canvas');if(q)cb(q)},80)}catch(e){}};if(window.QRCode)L();else{const t=document.createElement('script');t.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';t.onload=L;document.head.appendChild(t)}}
+function cert(){const w=$('#cw');if(!w)return;const nm=S.name||'مهندسة الصواريخ المبدعة',f=S.fails||0,st=f==0?3:f<=2?2:1;
+w.innerHTML=`<canvas id=ct width=700 height=480 style="margin-top:12px"></canvas><p class=mut style="text-align:center;margin-top:8px">📸 خذي لقطة شاشة للشهادة لتحتفظي بها</p>`;
+const c=$('#ct'),x=c.getContext('2d'),F='Tajawal,Tahoma,sans-serif';x.direction='rtl';x.textAlign='center';
+x.fillStyle='#0b1026';x.fillRect(0,0,700,480);x.strokeStyle='#ffb13d';x.lineWidth=6;x.strokeRect(14,14,672,452);x.lineWidth=2;x.strokeRect(26,26,648,428);
+drawR(x,350,78,0,{n:'p',t:'l',e:'s',f:'s'},.85);
+const T=(t,y,sz,col,b)=>{x.fillStyle=col;x.font=(b?'bold ':'')+sz+'px '+F;x.fillText(t,350,y)};
+T('شهادة مهندسة صواريخ',170,40,'#ffb13d',1);T('تُمنح هذه الشهادة إلى',212,22,'#c9d0f0');T(nm,272,46,'#fff',1);
+T('لإتمامها «مهمة المدار» بنجاح',318,22,'#c9d0f0');T('من التصميم حتى المدار',346,22,'#c9d0f0');T('التقييم: '+'★'.repeat(st)+'☆'.repeat(3-st)+(['','  جيد','  جيد جداً','  ممتاز'][st]),385,24,'#ffb13d',1);
+qr(q=>{x.fillStyle='#fff';x.fillRect(46,340,88,88);x.drawImage(q,50,344,80,80);x.fillStyle='#9aa6d6';x.font='11px '+F;x.fillText('امسحي للعب',90,444)});T('بمناسبة أسبوع الفضاء العالمي '+new Date().getFullYear(),418,18,'#9aa6d6');T('تصميم وإعداد: لجين الحربي - الصف الثاني 6',443,18,'#9aa6d6');
+}
+function landIntro(){snd(523,.2);snd(784,.35,'sine',.2,.2);
+note(4,'🎯','وصلتِ لمرحلة الهبوط!','أنهيتِ المراحل الأربع السابقة بنجاح',"اضغطي مطوّلاً على زر المحرك لإبطاء سقوط الصاروخ، واجعلي السرعة هادئة (اللون الأخضر) ثم اهبطي على المنصة. الوقود محدود، فلا تشغّليه طوال الوقت.","في بعض الصواريخ القابلة لإعادة الاستخدام (مثل فالكون 9) تعود المرحلة الأولى بعد انفصالها وتهبط على منصة. الجاذبية تسحبها للأسفل فتزداد سرعتها. ولو لمس الأرض بسرعة عالية لتحطّم، لذلك يشغّل المحرك بعكس اتجاه الجاذبية (دفع عكسي) ليبطّئ السقوط. وضعنا حداً للسرعة الآمنة في اللعبة ("+DF().safe+" أو أقل) لأن الهبوط الهادئ هو الذي يحمي الصاروخ.",landing,'ابدأ الهبوط')}
+function landing(){
+app.innerHTML=hd(4)+`<div class=tm id=tm></div><div class=fb><i id=fb></i></div><div class=w><canvas id=c width=360 height=380></canvas>${hint(46,86,0,12)}</div><button class="go hold" id=th>🔥 تشغيل المحرك</button>`;
+const c=$('#c'),x=c.getContext('2d'),b=$('#th'),cap=Math.max(S.fuel,6);
+let y=60,v=30,fuel=Math.max(S.f2,DF().lf),on=false,run=true,H=60,last=performance.now();const g=40;
+[b,c].forEach(e=>{e.onpointerdown=ev=>{on=true;try{e.setPointerCapture(ev.pointerId)}catch(_){}};e.onpointerup=e.onpointercancel=()=>on=false;e.oncontextmenu=ev=>ev.preventDefault()});
+const st=Array.from({length:40},()=>({x:Math.random()*360,y:Math.random()*340}));
+(function f(now){if(!run)return;const dt=Math.min(.05,(now-last)/1000);last=now;
+const burn=(on||K.ArrowUp||K[' '])&&fuel>0;if(burn){v+=(g-S.ratio*g)*dt;fuel-=dt*.6}else v+=g*dt;
+y+=v*dt;if(y<60){y=60;v=Math.max(v,0)}
+x.fillStyle='#0b1026';x.fillRect(0,0,360,380);x.fillStyle='#fff';st.forEach(s=>x.fillRect(s.x,s.y,1.5,1.5));
+x.fillStyle='#3ddc97';x.fillRect(110,340,140,12);x.fillStyle='#2a3566';x.fillRect(0,352,360,28);
+H=drawR(x,180,y,burn,D);
+const ok=v<=DF().safe;x.textAlign='center';x.font='bold 16px sans-serif';x.fillStyle=ok?'#3ddc97':'#ff7a85';x.fillText(ok?'🟢 السرعة هادئة':'🔴 السرعة عالية: شغّلي المحرك',180,28);
+fbar(fuel,cap);tele(Math.max(0,(340-y-H/2)/340*3).toFixed(1),Math.round(Math.max(0,v)*.5),ok?'سليم ✅':'ضغط عالٍ ⚠️');
+if(y+H/2>=340){run=false;
+if(ok)return pass(4,"المحرك يدفع عكس الجاذبية فيبطّئ السقوط، فتهبط المرحلة الأولى بسلام ويمكن إعادة استخدامها.",orbitIntro);
+return fail(fuel<=0.01?"نفد الوقود قبل الهبوط! وفّري الوقود وشغّلي المحرك في اللحظة المناسبة.":"الهبوط كان سريعاً! شغّلي المحرك مبكراً لتهدئة السرعة.",landing)}
+requestAnimationFrame(f)})(last)}
+intro();
+</script></body></html>
